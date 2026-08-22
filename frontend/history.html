@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>History — Voice RAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/shared.css?v=1">
+<style>
+  main { max-width: 720px; margin: 0 auto; padding: 60px 24px 100px; }
+
+  .page-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 16px; margin-bottom: 8px; flex-wrap: wrap;
+  }
+  h1 {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 30px; margin: 0;
+  }
+  .count {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink-faint);
+  }
+  .subhead { color: var(--ink-dim); font-size: 14px; margin: 10px 0 30px; }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 28px; }
+  #filterInput {
+    flex: 1;
+    background: var(--ground-2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 14px; color: var(--ink); font-family: "Plus Jakarta Sans", sans-serif; font-size: 14px;
+    outline: none;
+  }
+  #filterInput:focus { border-color: var(--violet-soft); }
+  #filterInput::placeholder { color: var(--ink-faint); }
+  #clearBtn {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.05em;
+    color: var(--warn); background: none; border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 14px; cursor: pointer; white-space: nowrap;
+  }
+  #clearBtn:hover { border-color: var(--warn); }
+
+  .empty {
+    text-align: center; padding: 90px 20px; color: var(--ink-faint);
+  }
+  .empty p.big {
+    font-family: "Fraunces", serif; font-style: italic; font-size: 20px; color: var(--ink-dim);
+    margin: 0 0 14px;
+  }
+  .empty a { color: var(--violet); text-decoration: none; border-bottom: 1px solid rgba(183,162,255,0.4); }
+
+  .entry {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--ground-2);
+    padding: 18px 20px; margin-bottom: 12px;
+  }
+  .entry-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .entry-meta { display: flex; align-items: center; gap: 10px; font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--ink-faint); }
+  .badge {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 3px 9px; border-radius: 999px;
+  }
+  .badge.ok { color: var(--ok); background: rgba(143,232,200,0.1); }
+  .badge.warn { color: var(--warn); background: rgba(242,180,131,0.1); }
+
+  .entry-q { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink-faint); margin-bottom: 8px; }
+  .entry-q span { color: var(--ink-dim); }
+  .entry-a {
+    font-family: "Fraunces", serif; font-size: 17px; line-height: 1.55; color: var(--ink);
+  }
+  .entry-a.refused { color: var(--warn); font-style: italic; font-weight: 300; }
+
+  details.entry-detail { margin-top: 14px; }
+  details.entry-detail summary {
+    cursor: pointer; list-style: none;
+    font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  details.entry-detail summary::-webkit-details-marker { display: none; }
+  .detail-body { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .lat-row { display: flex; align-items: center; gap: 10px; font-family: "IBM Plex Mono", monospace; font-size: 11px; }
+  .lat-label { width: 100px; color: var(--ink-faint); flex-shrink: 0; }
+  .lat-track { flex: 1; height: 3px; background: var(--ground-3); border-radius: 2px; overflow: hidden; }
+  .lat-fill { height: 100%; background: var(--violet); }
+  .lat-value { width: 54px; text-align: right; color: var(--ink-dim); flex-shrink: 0; }
+  .chunk {
+    font-size: 12px; color: var(--ink-dim); background: var(--ground-3);
+    border-radius: 8px; padding: 10px 12px; line-height: 1.5;
+  }
+  .chunk-meta { font-family: "IBM Plex Mono", monospace; font-size: 9px; color: var(--violet); text-transform: uppercase; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="wordmark" href="/">voice<b>·rag</b></a>
+    <div class="links">
+      <a href="/app">Ask</a>
+      <a href="/history" class="active">History</a>
+      <a href="/about">How it works</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="page-head">
+      <h1>History</h1>
+      <span class="count" id="countLabel"></span>
+    </div>
+    <p class="subhead">Every question you've asked in this browser, stored locally on your device — nothing is sent anywhere or shared.</p>
+
+    <div class="toolbar">
+      <input type="text" id="filterInput" placeholder="Filter your past questions…" />
+      <button id="clearBtn">clear history</button>
+    </div>
+
+    <div id="list"></div>
+  </main>
+
+  <footer class="site-footer">
+    <span>Voice RAG · MSMARCO-XI</span>
+    <span><a href="/app">ask another question →</a></span>
+  </footer>
+
+<script>
+const HISTORY_KEY = 'voicerag_history_v1';
+const STRATEGY_LABEL = { fixed_size: 'fixed', semantic: 'semantic', passage_native: 'passage' };
+const STAGE_LABEL = {
+  stt: 'stt', input_guardrail: 'input guard', retrieval: 'retrieval',
+  ontopic_guardrail: 'topic guard', generation: 'generation', groundedness_guardrail: 'ground guard',
+};
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    console.warn('Could not read local history:', err);
+    return [];
+  }
+}
+
+function formatTime(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return sameDay ? `today, ${time}` : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
+}
+
+function renderEntry(item) {
+  const timings = item.stage_timings_ms || {};
+  const maxMs = Math.max(1, ...Object.values(timings));
+  const barsHtml = Object.entries(timings).map(([k, v]) => `
+    <div class="lat-row">
+      <span class="lat-label">${escapeHtml(STAGE_LABEL[k] || k)}</span>
+      <div class="lat-track"><div class="lat-fill" style="width:${Math.max(2, (v / maxMs) * 100)}%"></div></div>
+      <span class="lat-value">${v.toFixed(1)}ms</span>
+    </div>`).join('');
+
+  const chunksHtml = (item.retrieved || []).map(c => `
+    <div class="chunk">
+      <div class="chunk-meta">${escapeHtml(STRATEGY_LABEL[c.strategy] || c.strategy)} · score ${c.score.toFixed(3)}</div>
+      ${escapeHtml(c.text)}
+    </div>`).join('');
+
+  return `
+    <div class="entry" data-q="${escapeHtml((item.query_text || '').toLowerCase())}" data-a="${escapeHtml((item.answer || '').toLowerCase())}">
+      <div class="entry-top">
+        <span class="badge ${item.refused ? 'warn' : 'ok'}">${item.refused ? 'refused' : 'grounded'}</span>
+        <span class="entry-meta">${formatTime(item.ts)} · ${(item.total_latency_ms || 0).toFixed(0)}ms</span>
+      </div>
+      <div class="entry-q">you asked — <span>${escapeHtml(item.query_text) || '(empty)'}</span></div>
+      <div class="entry-a ${item.refused ? 'refused' : ''}">${escapeHtml(item.answer)}</div>
+      ${(barsHtml || chunksHtml) ? `
+      <details class="entry-detail">
+        <summary>+ details</summary>
+        <div class="detail-body">
+          ${barsHtml}
+          ${chunksHtml}
+        </div>
+      </details>` : ''}
+    </div>`;
+}
+
+function render() {
+  const list = document.getElementById('list');
+  const countLabel = document.getElementById('countLabel');
+  const history = loadHistory();
+  countLabel.textContent = history.length ? `${history.length} question${history.length === 1 ? '' : 's'}` : '';
+
+  if (!history.length) {
+    list.innerHTML = `
+      <div class="empty">
+        <p class="big">Nothing here yet.</p>
+        <p>Once you <a href="/app">ask a question</a>, it'll show up here.</p>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = history.map(renderEntry).join('');
+}
+
+document.getElementById('filterInput').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('.entry').forEach(el => {
+    const matches = !q || el.dataset.q.includes(q) || el.dataset.a.includes(q);
+    el.style.display = matches ? '' : 'none';
+  });
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  if (!loadHistory().length) return;
+  if (confirm('Clear all local history? This cannot be undone.')) {
+    localStorage.removeItem(HISTORY_KEY);
+    render();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
