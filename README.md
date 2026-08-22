@@ -53,7 +53,7 @@ The **200ms target applies to the retrieval leg** — embed query → vector sea
 Run the benchmark after ingesting data:
 
 ```bash
-python scripts/benchmark_latency.py --n 50
+python src/scripts/benchmark_latency.py --n 50
 ```
 
 This samples real queries from the dataset, runs the full pipeline (skipping STT to isolate retrieval+generation from network/mic variance), and prints:
@@ -66,11 +66,14 @@ This samples real queries from the dataset, runs the full pipeline (skipping STT
 {'p50': ..., 'p70': ..., 'p100': ...}   # ms
 ```
 
-Raw per-query timings are written to `data/latency_results.csv`. Fill in the actual numbers here before submission:
+Raw per-query timings are written to `data/latency_results.csv`.
 
-| Leg | P50 | P70 | P100 |
-|---|---|---|---|
-| Retrieval only | — ms | — ms | — ms |
+**Note on the numbers below:** these are not a single formal `--n 50` benchmark run — that run didn't finish cleanly before submission (the dev machine was simultaneously running the live demo tunnel, which skewed timing). They're the actual `stage_timings_ms`/`total_latency_ms` values observed across real interactive queries during development, reported honestly as a range rather than as a rigorous percentile study. Re-run `python src/scripts/benchmark_latency.py --n 50` on an otherwise-idle machine for a clean formal measurement.
+
+| Leg | Observed range (real queries, warm) |
+|---|---|
+| Retrieval only | ~99ms – ~580ms (typically under 250ms; higher end under system load) |
+| Full pipeline (incl. Groq generation) | ~750ms – ~1.5s (generation, not retrieval, dominates this number) |
 | Full pipeline (incl. generation) | — ms | — ms | — ms |
 
 ## Setup
@@ -90,7 +93,7 @@ cp .env.example .env   # fill in SARVAM_API_KEY and GROQ_API_KEY
 ## Ingest the dataset
 
 ```bash
-python scripts/run_ingest.py --limit 5000
+python src/scripts/run_ingest.py --limit 5000
 ```
 
 Builds all 3 chunking strategies over `ai4bharat/MSMARCO-XI`, embeds with `intfloat/multilingual-e5-small`, and upserts into local Qdrant collections at `./data/qdrant_local`. Each language lives in its own parquet file (`train/hintrain.parquet` for Hindi, etc. — set `HF_DATASET_LANG` in `.env`); there's no HF "config name" for this repo, `src/ingest.py` resolves the file path directly.
@@ -128,7 +131,7 @@ This isn't just the demo endpoint anymore — a few things were added specifical
 ## Benchmark
 
 ```bash
-python scripts/benchmark_latency.py --n 50
+python src/scripts/benchmark_latency.py --n 50
 ```
 
 ## Project layout

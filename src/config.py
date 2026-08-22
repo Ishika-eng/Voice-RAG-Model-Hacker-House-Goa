@@ -15,7 +15,7 @@ class Settings:
     top_k: int = int(os.getenv("TOP_K", "5"))
 
     hf_dataset: str = os.getenv("HF_DATASET", "ai4bharat/MSMARCO-XI")
-    hf_dataset_lang: str = os.getenv("HF_DATASET_LANG", "hi")
+    hf_dataset_lang: str = os.getenv("HF_DATASET_LANG", "hin")
     ingest_limit: int = int(os.getenv("INGEST_LIMIT", "20000"))
 
     offtopic_sim_threshold: float = float(os.getenv("OFFTOPIC_SIM_THRESHOLD", "0.72"))
