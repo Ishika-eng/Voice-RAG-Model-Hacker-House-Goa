@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>How it works — Voice RAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/shared.css?v=1">
+<style>
+  main { max-width: 700px; margin: 0 auto; padding: 60px 24px 100px; }
+
+  h1 {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 32px; margin: 0 0 10px;
+  }
+  .subhead { color: var(--ink-dim); font-size: 15px; line-height: 1.6; margin: 0 0 56px; max-width: 58ch; }
+
+  article section { margin-bottom: 54px; }
+  article h2 {
+    font-family: "Plus Jakarta Sans", sans-serif; font-weight: 700; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.1em; color: var(--violet);
+    margin: 0 0 18px;
+  }
+  article h3 {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 20px; color: var(--ink);
+    margin: 0 0 10px;
+  }
+  article p {
+    font-size: 15px; line-height: 1.75; color: var(--ink-dim); margin: 0 0 14px;
+    max-width: 62ch;
+  }
+  article p b { color: var(--ink); font-weight: 600; }
+  article code {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.9em; color: var(--violet);
+    background: var(--ground-2); padding: 1px 6px; border-radius: 4px;
+  }
+
+  .pipeline {
+    display: flex; flex-direction: column; gap: 0;
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin: 20px 0;
+  }
+  .pipeline .stage {
+    display: flex; align-items: baseline; gap: 16px;
+    padding: 16px 20px; border-bottom: 1px solid var(--line);
+  }
+  .pipeline .stage:last-child { border-bottom: none; }
+  .pipeline .stage .n { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--ink-faint); width: 18px; flex-shrink: 0; }
+  .pipeline .stage .body b { color: var(--ink); font-family: "Plus Jakarta Sans", sans-serif; font-weight: 600; font-size: 14px; }
+  .pipeline .stage .body span { display: block; color: var(--ink-dim); font-size: 13px; margin-top: 3px; line-height: 1.5; }
+
+  .strategy-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0; }
+  @media (max-width: 640px) { .strategy-grid { grid-template-columns: 1fr; } }
+  .strategy-card {
+    border: 1px solid var(--line); border-radius: 10px; padding: 16px; background: var(--ground-2);
+  }
+  .strategy-card .tag {
+    font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--violet); margin-bottom: 8px;
+  }
+  .strategy-card p { font-size: 13px; margin: 0; }
+
+  .guard-list { display: flex; flex-direction: column; gap: 14px; margin: 20px 0; }
+  .guard-item {
+    display: flex; gap: 14px; padding: 14px 18px;
+    border-left: 2px solid var(--violet-soft); background: var(--ground-2); border-radius: 0 8px 8px 0;
+  }
+  .guard-item b { color: var(--ink); font-family: "Plus Jakarta Sans", sans-serif; font-size: 14px; display: block; margin-bottom: 4px; }
+  .guard-item span { color: var(--ink-dim); font-size: 13px; line-height: 1.55; }
+
+  .cta-band {
+    text-align: center; padding: 50px 24px; border: 1px solid var(--line); border-radius: 14px;
+    background: var(--ground-2); margin-top: 60px;
+  }
+  .cta-band p { font-family: "Fraunces", serif; font-style: italic; font-size: 19px; color: var(--ink); margin: 0 0 22px; }
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--violet); color: #140f24;
+    padding: 13px 24px; border-radius: 999px;
+    font-family: "Plus Jakarta Sans", sans-serif; font-weight: 600; font-size: 14px;
+    text-decoration: none;
+  }
+</style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="wordmark" href="/">voice<b>·rag</b></a>
+    <div class="links">
+      <a href="/app">Ask</a>
+      <a href="/history">History</a>
+      <a href="/about" class="active">How it works</a>
+    </div>
+  </nav>
+
+  <main>
+    <h1>How it works</h1>
+    <p class="subhead">A written walk-through of the pipeline behind every answer — for anyone deciding whether to trust it, not just how to use it.</p>
+
+    <article>
+      <section>
+        <h2>The pipeline</h2>
+        <h3>Every question passes through four checkpoints</h3>
+        <p>None of them are optional, and any of them can end the request early with a plain refusal rather than a guess. This is a harness, not a single prompt-in, text-out call — each stage has typed input/output, retries where a transient failure is plausible (the network calls to Sarvam and Groq), and its own timing measurement.</p>
+        <div class="pipeline">
+          <div class="stage"><span class="n">01</span><div class="body"><b>Speech-to-text</b><span>Sarvam's <code>saaras:v3</code> model transcribes the recorded audio. If it fails or returns nothing, the request ends in a refusal rather than falling through with an empty query.</span></div></div>
+          <div class="stage"><span class="n">02</span><div class="body"><b>Input guardrail</b><span>Empty queries, queries matching unsafe-content patterns, and oversized input are rejected before anything is retrieved.</span></div></div>
+          <div class="stage"><span class="n">03</span><div class="body"><b>Retrieval</b><span>The query is embedded and searched against three separately-indexed chunking strategies in parallel, then merged by Reciprocal Rank Fusion.</span></div></div>
+          <div class="stage"><span class="n">04</span><div class="body"><b>Topic guardrail</b><span>If nothing sufficiently relevant came back, the system refuses instead of answering from weak or unrelated context.</span></div></div>
+          <div class="stage"><span class="n">05</span><div class="body"><b>Generation</b><span>Groq drafts an answer, constrained by a system prompt to use only the retrieved passages — nothing outside that context.</span></div></div>
+          <div class="stage"><span class="n">06</span><div class="body"><b>Groundedness guardrail</b><span>The answer is checked against the retrieved text for actual lexical support. If it doesn't hold up, it's discarded in favor of an honest refusal.</span></div></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Retrieval</h2>
+        <h3>Three chunking strategies, not one</h3>
+        <p>The dataset is indexed three separate ways, each with its own strengths, and a query searches all three at once:</p>
+        <div class="strategy-grid">
+          <div class="strategy-card">
+            <div class="tag">Fixed-size</div>
+            <p>A 60-word sliding window with 15-word overlap. The dependable baseline when passage structure doesn't help.</p>
+          </div>
+          <div class="strategy-card">
+            <div class="tag">Semantic</div>
+            <p>Sentences are embedded individually and merged while adjacent ones stay topically similar — variable-length, coherent chunks instead of arbitrary cuts.</p>
+          </div>
+          <div class="strategy-card">
+            <div class="tag">Passage-native</div>
+            <p>MS MARCO passages are already curated retrieval units, so this strategy trusts that segmentation instead of re-splitting it.</p>
+          </div>
+        </div>
+        <p>Results from all three are merged with <b>Reciprocal Rank Fusion</b> — rank-based rather than raw-score-based, since a 60-word window and a single-sentence semantic chunk aren't directly comparable on score alone. Passages MS MARCO's own annotators marked relevant get a small boost in the fusion.</p>
+      </section>
+
+      <section>
+        <h2>Guardrails</h2>
+        <h3>Knowing when not to answer</h3>
+        <p>A model that always answers isn't trustworthy — it's just confident. Three checks stand between a question and an answer:</p>
+        <div class="guard-list">
+          <div class="guard-item"><div><b>Input safety</b><span>Blocks unsafe or harmful query patterns, empty input, and oversized input before retrieval runs at all.</span></div></div>
+          <div class="guard-item"><div><b>Off-topic detection</b><span>If the best retrieval match falls below a similarity threshold, the system refuses rather than stretching an answer out of weak context.</span></div></div>
+          <div class="guard-item"><div><b>Groundedness</b><span>After generation, the answer is checked for how much of it is actually supported by the retrieved text. Below threshold, it's replaced with a refusal — deliberately a fast lexical-overlap check rather than a second LLM call, to stay on the latency-critical path.</span></div></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Latency</h2>
+        <h3>What the 200ms target actually covers</h3>
+        <p>The target applies to the <b>retrieval leg</b> — embedding the query, searching all three collections, and merging results. Chunking happens once, offline, at indexing time, so it's off the query-time path entirely. Generation (the Groq API round-trip) is measured and reported separately and honestly, since no network LLM call finishes in 200ms — folding it into the same number would misrepresent what's actually fast.</p>
+      </section>
+    </article>
+
+    <div class="cta-band">
+      <p>Curious what it actually says?</p>
+      <a href="/app" class="btn-primary">🎙 Ask it something</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <span>Voice RAG · MSMARCO-XI</span>
+    <span><a href="/app">back to the app →</a></span>
+  </footer>
+</body>
+</html>
