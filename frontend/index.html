@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Voice RAG — Grounded voice search over MSMARCO-XI</title>
+<meta name="description" content="Ask a question out loud in Hindi. Voice RAG transcribes it, retrieves from MSMARCO-XI with three chunking strategies, and answers only what it can prove." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/shared.css?v=1">
+<style>
+  main { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- hero ---------- */
+  .hero {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 40px;
+    align-items: center;
+    padding: 90px 0 70px;
+  }
+  @media (max-width: 800px) {
+    .hero { grid-template-columns: 1fr; padding: 50px 0 40px; text-align: center; }
+    .hero-orb { order: -1; margin: 0 auto; }
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--violet);
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-family: "Fraunces", serif;
+    font-weight: 400;
+    font-size: 46px;
+    line-height: 1.15;
+    letter-spacing: -0.005em;
+    margin: 0 0 22px;
+    text-wrap: balance;
+  }
+  .hero h1 b { font-weight: 600; color: var(--violet); }
+  @media (max-width: 480px) { .hero h1 { font-size: 34px; } }
+
+  .hero p.lede {
+    font-size: 16px;
+    line-height: 1.65;
+    color: var(--ink-dim);
+    max-width: 48ch;
+    margin: 0 0 32px;
+  }
+  @media (max-width: 800px) { .hero p.lede { margin-left: auto; margin-right: auto; } }
+
+  .cta-row { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+  @media (max-width: 800px) { .cta-row { justify-content: center; } }
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--violet); color: #140f24;
+    padding: 14px 26px; border-radius: 999px;
+    font-family: "Plus Jakarta Sans", sans-serif; font-weight: 600; font-size: 14px;
+    text-decoration: none;
+    box-shadow: 0 16px 40px -14px rgba(183, 162, 255, 0.55);
+    transition: transform 0.15s ease;
+  }
+  .btn-primary:hover { transform: translateY(-1px); }
+  .btn-secondary {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: 0.05em;
+    color: var(--ink-dim); text-decoration: underline; text-decoration-color: var(--line);
+    text-underline-offset: 4px;
+  }
+  .btn-secondary:hover { color: var(--ink); }
+
+  .hero-orb {
+    position: relative;
+    width: 220px; height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 34% 30%, #f1ecff 0%, #b7a2ff 32%, #6d5cc4 62%, #1e1638 100%);
+    box-shadow: 0 0 90px 6px rgba(183, 162, 255, 0.35);
+    animation: breathe 4.2s ease-in-out infinite;
+    justify-self: center;
+  }
+  @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+  .hero-orb::after {
+    content: "";
+    position: absolute; inset: -20px; border-radius: 50%;
+    border: 1px solid rgba(183, 162, 255, 0.14);
+  }
+
+  /* ---------- how it works ---------- */
+  section.how { padding: 70px 0; border-top: 1px solid var(--line); }
+  section.how h2 {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 26px;
+    margin: 0 0 8px;
+  }
+  section.how > p {
+    color: var(--ink-dim); font-size: 14px; margin: 0 0 44px; max-width: 56ch;
+  }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; }
+  @media (max-width: 800px) { .steps { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 480px) { .steps { grid-template-columns: 1fr; } }
+  .step .num {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--violet);
+    margin-bottom: 10px;
+  }
+  .step h3 {
+    font-family: "Plus Jakarta Sans", sans-serif; font-weight: 600; font-size: 15px;
+    margin: 0 0 8px; color: var(--ink);
+  }
+  .step p {
+    font-size: 13px; line-height: 1.6; color: var(--ink-dim); margin: 0;
+  }
+
+  /* ---------- stats ---------- */
+  section.stats {
+    padding: 60px 0;
+    border-top: 1px solid var(--line);
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
+  }
+  @media (max-width: 800px) { section.stats { grid-template-columns: 1fr 1fr; } }
+  .stat .num {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 32px; color: var(--ink);
+  }
+  .stat .lbl {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--ink-faint); margin-top: 6px;
+  }
+
+  /* ---------- stack ---------- */
+  section.stack { padding: 50px 0 80px; border-top: 1px solid var(--line); }
+  section.stack h2 {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 20px; margin: 0 0 22px;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: 0.03em;
+    color: var(--ink-dim); background: var(--ground-2); border: 1px solid var(--line);
+    padding: 8px 14px; border-radius: 999px;
+  }
+</style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="wordmark" href="/">voice<b>·rag</b></a>
+    <div class="links">
+      <a href="/app">Ask</a>
+      <a href="/history">History</a>
+      <a href="/about">How it works</a>
+      <a href="/app" class="cta">Try it →</a>
+    </div>
+  </nav>
+
+  <main>
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Grounded · Retrieval-Augmented · Voice-Native</div>
+        <h1>Speak, and it will <b>listen for the truth</b> — not just an answer.</h1>
+        <p class="lede">Ask a question out loud in Hindi. Voice RAG transcribes it, searches MSMARCO-XI with three chunking strategies running at once, and answers only from what it actually finds in the retrieved context — or tells you plainly when it can't.</p>
+        <div class="cta-row">
+          <a href="/app" class="btn-primary">🎙 Ask something</a>
+          <a href="/about" class="btn-secondary">see how it works</a>
+        </div>
+      </div>
+      <div class="hero-orb" aria-hidden="true"></div>
+    </section>
+
+    <section class="how">
+      <h2>Four stages, every time</h2>
+      <p>Nothing about an answer is a black box — each question passes through the same four checkpoints, in order, and any of them can end the request with a plain refusal instead of a guess.</p>
+      <div class="steps">
+        <div class="step">
+          <div class="num">01</div>
+          <h3>Transcribe</h3>
+          <p>Sarvam's speech model turns your spoken Hindi into text, with retries built in for a flaky connection.</p>
+        </div>
+        <div class="step">
+          <div class="num">02</div>
+          <h3>Guard the input</h3>
+          <p>Empty, unsafe, or oversized queries are rejected before anything gets retrieved.</p>
+        </div>
+        <div class="step">
+          <div class="num">03</div>
+          <h3>Retrieve</h3>
+          <p>Fixed-size, semantic, and passage-native chunking strategies are searched in parallel and fused by rank.</p>
+        </div>
+        <div class="step">
+          <div class="num">04</div>
+          <h3>Generate &amp; verify</h3>
+          <p>Groq drafts an answer from the retrieved text only; a groundedness check can still veto it before you see it.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats">
+      <div class="stat"><div class="num">3</div><div class="lbl">Chunking strategies</div></div>
+      <div class="stat"><div class="num">800K+</div><div class="lbl">Chunks indexed</div></div>
+      <div class="stat"><div class="num">3</div><div class="lbl">Guardrail checkpoints</div></div>
+      <div class="stat"><div class="num">&lt;200ms</div><div class="lbl">Retrieval target</div></div>
+    </section>
+
+    <section class="stack">
+      <h2>Built with</h2>
+      <div class="chips">
+        <span class="chip">Sarvam STT</span>
+        <span class="chip">Qdrant</span>
+        <span class="chip">Groq</span>
+        <span class="chip">FastAPI</span>
+        <span class="chip">multilingual-e5</span>
+        <span class="chip">MSMARCO-XI</span>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>Voice RAG · MSMARCO-XI</span>
+    <span><a href="/about">architecture &amp; methodology →</a></span>
+  </footer>
+</body>
+</html>
