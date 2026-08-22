@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ask — Voice RAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/shared.css?v=1">
+<style>
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 80px 24px 100px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  /* ---------- orb ---------- */
+  .orb-stage { position: relative; width: 320px; height: 320px; margin-bottom: 8px; }
+  #orb { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+  .orb-ring {
+    position: absolute; inset: -22px; border-radius: 50%;
+    border: 1px solid rgba(183, 162, 255, 0.16);
+    pointer-events: none;
+  }
+  .orb-ring.r2 { inset: -46px; border-color: rgba(183, 162, 255, 0.08); }
+  @media (max-width: 480px) {
+    .orb-stage { width: 220px; height: 220px; }
+  }
+
+  .orb-state {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-top: 18px;
+    min-height: 16px;
+    transition: color 0.3s ease;
+  }
+  .orb-state.listening { color: var(--violet); }
+  .orb-state.thinking { color: var(--ink-dim); }
+  .orb-state.ok { color: var(--ok); }
+  .orb-state.warn { color: var(--warn); }
+
+  .prompt {
+    font-family: "Fraunces", serif;
+    font-weight: 300;
+    font-size: 30px;
+    line-height: 1.28;
+    letter-spacing: 0.002em;
+    color: var(--ink-dim);
+    margin: 30px 0 0;
+    max-width: 30ch;
+    text-wrap: balance;
+  }
+  .prompt b { font-weight: 500; color: var(--ink); }
+  @media (max-width: 480px) { .prompt { font-size: 22px; } }
+
+  .type-toggle {
+    margin-top: 26px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--ink-faint);
+    background: none; border: none; cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: rgba(156, 146, 189, 0.35);
+    text-underline-offset: 4px;
+    padding: 4px;
+  }
+  .type-toggle:hover { color: var(--ink-dim); }
+
+  #textForm {
+    display: none;
+    align-items: center;
+    gap: 0;
+    margin-top: 22px;
+    width: 100%;
+    max-width: 440px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 10px;
+  }
+  #textForm.open { display: flex; }
+  #textQuery {
+    flex: 1;
+    background: none; border: none; outline: none;
+    color: var(--ink);
+    font-family: "Plus Jakarta Sans", sans-serif;
+    font-size: 15px;
+    min-width: 0;
+  }
+  #textQuery::placeholder { color: var(--ink-faint); }
+  #askBtn {
+    background: none; border: none; color: var(--violet);
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: 0.06em;
+    cursor: pointer; padding: 4px 0 4px 12px; flex-shrink: 0;
+  }
+  #askBtn:disabled { opacity: 0.4; cursor: default; }
+
+  /* ---------- answer ---------- */
+  #result { width: 100%; margin-top: 56px; }
+  .answer-wrap { animation: rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .transcript-line {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    letter-spacing: 0.02em;
+    margin-bottom: 18px;
+  }
+  .transcript-line span { color: var(--ink-dim); }
+
+  .answer-text {
+    font-family: "Fraunces", serif;
+    font-weight: 400;
+    font-size: 24px;
+    line-height: 1.55;
+    letter-spacing: -0.001em;
+    color: var(--ink);
+    text-align: left;
+    white-space: pre-wrap;
+  }
+  .answer-text.refused { color: var(--warn); font-style: italic; font-weight: 300; }
+  @media (max-width: 480px) { .answer-text { font-size: 19px; } }
+
+  .refusal-reason {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-top: 12px;
+    text-align: left;
+  }
+
+  .save-note {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    text-align: left;
+    margin-top: 14px;
+  }
+  .save-note a { color: var(--violet); text-decoration: none; border-bottom: 1px solid rgba(183,162,255,0.4); }
+
+  details.reveal {
+    margin-top: 34px;
+    text-align: left;
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+  }
+  details.reveal summary {
+    cursor: pointer;
+    list-style: none;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: flex; align-items: center; gap: 6px;
+  }
+  details.reveal summary::-webkit-details-marker { display: none; }
+  details.reveal summary::before { content: "＋"; font-size: 12px; color: var(--violet); transition: transform 0.2s; }
+  details.reveal[open] summary::before { content: "－"; }
+  details.reveal summary:hover { color: var(--ink-dim); }
+
+  .reveal-body { margin-top: 18px; display: flex; flex-direction: column; gap: 22px; }
+
+  .lat-row { display: flex; align-items: center; gap: 10px; font-family: "IBM Plex Mono", monospace; font-size: 11px; }
+  .lat-label { width: 108px; color: var(--ink-faint); flex-shrink: 0; }
+  .lat-track { flex: 1; height: 3px; background: var(--ground-3); border-radius: 2px; overflow: hidden; }
+  .lat-fill { height: 100%; background: var(--violet); }
+  .lat-value { width: 56px; text-align: right; color: var(--ink-dim); flex-shrink: 0; }
+  .lat-total { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink-dim); margin-bottom: 10px; }
+  .lat-total b { color: var(--violet); }
+
+  .chunk {
+    font-size: 13px;
+    color: var(--ink-dim);
+    background: var(--ground-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    line-height: 1.55;
+    text-align: left;
+  }
+  .chunk-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-family: "IBM Plex Mono", monospace; font-size: 10px; }
+  .strategy-tag { text-transform: uppercase; letter-spacing: 0.06em; color: var(--violet); }
+  .score-tag { color: var(--ink-faint); }
+
+  .banner {
+    width: 100%;
+    text-align: left;
+    background: var(--ground-2);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--warn);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 24px;
+    font-size: 13px;
+    color: var(--ink-dim);
+    display: none;
+  }
+  .banner.show { display: block; }
+</style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="wordmark" href="/">voice<b>·rag</b></a>
+    <div class="links">
+      <a href="/app" class="active">Ask</a>
+      <a href="/history">History</a>
+      <a href="/about">How it works</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="orb-stage">
+      <div class="orb-ring"></div>
+      <div class="orb-ring r2"></div>
+      <canvas id="orb" aria-label="Tap to record a question" role="button" tabindex="0"></canvas>
+    </div>
+    <div class="orb-state" id="orbState">tap to speak</div>
+
+    <p class="prompt" id="promptText">Ask it something. <b>It only answers what it can prove</b> — and says so plainly when it can't.</p>
+
+    <button class="type-toggle" id="typeToggle">or type your question instead</button>
+    <form id="textForm">
+      <input type="text" id="textQuery" placeholder="दिल्ली भारत की राजधानी कहाँ है" autocomplete="off" />
+      <button type="submit" id="askBtn">ask →</button>
+    </form>
+
+    <div class="banner" id="banner"></div>
+    <div id="result"></div>
+  </main>
+
+  <footer class="site-footer">
+    <span>Sarvam · Multi-strategy chunking · Qdrant · Groq · Guarded generation</span>
+    <span><a href="/history">view history →</a></span>
+  </footer>
+
+<script>
+/* ---------------------------------------------------------------
+   The orb is the entire interface: a canvas-rendered sphere of
+   drifting light that (a) IS the record button, (b) visibly reacts
+   to your actual microphone amplitude while recording via the Web
+   Audio API -- not a canned animation -- and (c) settles into a
+   calm or a warm tone depending on whether the answer that follows
+   was grounded or refused.
+------------------------------------------------------------------ */
+const orbState = (() => {
+  const canvas = document.getElementById('orb');
+  const ctx = canvas.getContext('2d');
+  let W, H, DPR, cx, cy, R;
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = rect.width; H = rect.height;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    cx = W / 2; cy = H / 2; R = Math.min(W, H) / 2 - 14;
+  }
+  window.addEventListener('resize', resize);
+
+  // mode: idle | listening | thinking | ok | warn
+  let mode = 'idle';
+  let level = 0;        // live mic amplitude, 0..1
+  let smoothLevel = 0;
+  let breathe = 0;
+  let swirl = 0;
+  let settleGlow = 0;   // brief bright flash when a result lands
+
+  const PALETTES = {
+    idle:      { core: [235, 224, 255], mid: [150, 120, 230], edge: [30, 18, 60], glow: [150, 120, 230] },
+    listening: { core: [255, 250, 255], mid: [183, 162, 255], edge: [45, 24, 90], glow: [183, 162, 255] },
+    thinking:  { core: [220, 210, 255], mid: [120, 100, 200], edge: [24, 14, 50], glow: [140, 120, 220] },
+    ok:        { core: [235, 255, 248], mid: [143, 232, 200], edge: [16, 40, 34], glow: [143, 232, 200] },
+    warn:      { core: [255, 240, 225], mid: [242, 180, 131], edge: [45, 26, 16], glow: [242, 180, 131] },
+  };
+  let paletteMix = { ...PALETTES.idle };
+  let targetPalette = PALETTES.idle;
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function lerpColor(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+
+  function setMode(next) {
+    mode = next;
+    targetPalette = PALETTES[next] || PALETTES.idle;
+    if (next === 'ok' || next === 'warn') settleGlow = 1;
+  }
+
+  function setLevel(v) { level = v; }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    breathe += 0.012;
+    swirl += mode === 'thinking' ? 0.045 : mode === 'listening' ? 0.02 : 0.008;
+    smoothLevel += (level - smoothLevel) * 0.25;
+    settleGlow *= 0.96;
+
+    ['core', 'mid', 'edge', 'glow'].forEach(k => {
+      paletteMix[k] = lerpColor(paletteMix[k], targetPalette[k], 0.04);
+    });
+
+    const idleBob = Math.sin(breathe) * 0.02;
+    const micBoost = smoothLevel * 0.22;
+    const thinkBoost = mode === 'thinking' ? Math.sin(swirl * 2) * 0.015 : 0;
+    const scale = 1 + idleBob + micBoost + thinkBoost + settleGlow * 0.05;
+    const r = R * scale;
+
+    const maxGlowR = Math.min(W, H) / 2 - 2;
+    const glowR = Math.min(r * (1.5 + smoothLevel * 0.6 + settleGlow * 0.4), maxGlowR);
+    const glow = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, glowR);
+    glow.addColorStop(0, `rgba(${paletteMix.glow.map(Math.round).join(',')}, ${0.35 + smoothLevel * 0.25 + settleGlow * 0.3})`);
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(cx, cy, glowR, 0, Math.PI * 2); ctx.fill();
+
+    const hlAngle = swirl * 0.6;
+    const hlx = cx + Math.cos(hlAngle) * r * 0.28;
+    const hly = cy + Math.sin(hlAngle) * r * 0.24 - r * 0.12;
+    const body = ctx.createRadialGradient(hlx, hly, r * 0.05, cx, cy, r);
+    body.addColorStop(0, `rgba(${paletteMix.core.map(Math.round).join(',')}, 1)`);
+    body.addColorStop(0.45, `rgba(${paletteMix.mid.map(Math.round).join(',')}, 1)`);
+    body.addColorStop(1, `rgba(${paletteMix.edge.map(Math.round).join(',')}, 1)`);
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
+    const bandAngle = swirl * 0.9;
+    const bx = cx + Math.cos(bandAngle + Math.PI) * r * 0.5;
+    const by = cy + Math.sin(bandAngle + Math.PI) * r * 0.5;
+    const band = ctx.createRadialGradient(bx, by, 0, bx, by, r * 0.9);
+    band.addColorStop(0, `rgba(${paletteMix.core.map(Math.round).join(',')}, ${0.18 + smoothLevel * 0.2})`);
+    band.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = band;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+
+    ctx.beginPath(); ctx.arc(cx, cy, r - 0.5, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${paletteMix.core.map(Math.round).join(',')}, 0.25)`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  draw();
+  return { setMode, setLevel };
+})();
+
+/* ---------------------------------------------------------------
+   App logic: recording (with live amplitude -> orb), text fallback,
+   result rendering, local history persistence, and error handling
+   (network failure, mic denial, rate limiting).
+------------------------------------------------------------------ */
+const orbCanvas = document.getElementById('orb');
+const orbStateLabel = document.getElementById('orbState');
+const promptText = document.getElementById('promptText');
+const typeToggle = document.getElementById('typeToggle');
+const textForm = document.getElementById('textForm');
+const textQuery = document.getElementById('textQuery');
+const askBtn = document.getElementById('askBtn');
+const bannerEl = document.getElementById('banner');
+
+let mediaRecorder, chunks = [], audioCtx, analyser, levelRAF, stream;
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+function showBanner(message) {
+  bannerEl.textContent = message;
+  bannerEl.classList.add('show');
+}
+function hideBanner() {
+  bannerEl.classList.remove('show');
+}
+
+function setOrbState(mode, label) {
+  orbState.setMode(mode);
+  orbStateLabel.textContent = label;
+  orbStateLabel.className = 'orb-state ' + mode;
+}
+
+function startLevelMeter(mediaStream) {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 512;
+  const source = audioCtx.createMediaStreamSource(mediaStream);
+  source.connect(analyser);
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  function tick() {
+    analyser.getByteTimeDomainData(data);
+    let sumSquares = 0;
+    for (let i = 0; i < data.length; i++) {
+      const v = (data[i] - 128) / 128;
+      sumSquares += v * v;
+    }
+    const rms = Math.sqrt(sumSquares / data.length);
+    orbState.setLevel(Math.min(1, rms * 4));
+    levelRAF = requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function stopLevelMeter() {
+  if (levelRAF) cancelAnimationFrame(levelRAF);
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  orbState.setLevel(0);
+}
+
+async function parseErrorResponse(res) {
+  try {
+    const body = await res.json();
+    return body.detail || body.error || `Request failed (${res.status}).`;
+  } catch {
+    return `Request failed (${res.status}).`;
+  }
+}
+
+async function toggleRecording() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    return;
+  }
+  hideBanner();
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    setOrbState('warn', 'microphone unavailable');
+    showBanner('Microphone access was denied or is unavailable in this browser. You can type your question instead.');
+    return;
+  }
+  mediaRecorder = new MediaRecorder(stream);
+  chunks = [];
+  mediaRecorder.ondataavailable = e => chunks.push(e.data);
+  mediaRecorder.onstop = async () => {
+    stopLevelMeter();
+    stream.getTracks().forEach(t => t.stop());
+    setOrbState('thinking', 'listening for the truth…');
+    promptText.textContent = 'Transcribing → retrieving → generating…';
+    const blob = new Blob(chunks, { type: 'audio/webm' });
+    const formData = new FormData();
+    formData.append('file', blob, 'query.webm');
+    formData.append('language_code', 'hi-IN');
+    try {
+      const res = await fetch('/ask/audio', { method: 'POST', body: formData });
+      if (!res.ok) {
+        const msg = await parseErrorResponse(res);
+        setOrbState('warn', res.status === 429 ? 'rate limited' : 'something went wrong');
+        promptText.textContent = 'Ask another question.';
+        showBanner(msg);
+        return;
+      }
+      renderResult(await res.json());
+    } catch (err) {
+      setOrbState('warn', 'connection lost');
+      promptText.textContent = 'Ask another question.';
+      showBanner("Couldn't reach the server. Check your connection and try again.");
+    }
+  };
+  mediaRecorder.start();
+  startLevelMeter(stream);
+  setOrbState('listening', 'listening…');
+  promptText.textContent = 'Speak now. Tap the orb again to stop.';
+}
+
+orbCanvas.addEventListener('click', toggleRecording);
+orbCanvas.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRecording(); } });
+
+typeToggle.addEventListener('click', () => {
+  const open = textForm.classList.toggle('open');
+  typeToggle.style.display = open ? 'none' : 'inline';
+  if (open) textQuery.focus();
+});
+
+textForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const query = textQuery.value.trim();
+  if (!query) return;
+  hideBanner();
+  askBtn.disabled = true;
+  setOrbState('thinking', 'listening for the truth…');
+  promptText.textContent = 'Retrieving → generating…';
+  const formData = new FormData();
+  formData.append('query', query);
+  try {
+    const res = await fetch('/ask/text', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const msg = await parseErrorResponse(res);
+      setOrbState('warn', res.status === 429 ? 'rate limited' : 'something went wrong');
+      promptText.textContent = 'Ask another question.';
+      showBanner(msg);
+      return;
+    }
+    renderResult(await res.json());
+  } catch (err) {
+    setOrbState('warn', 'connection lost');
+    promptText.textContent = 'Ask another question.';
+    showBanner("Couldn't reach the server. Check your connection and try again.");
+  } finally {
+    askBtn.disabled = false;
+  }
+});
+
+const STRATEGY_LABEL = { fixed_size: 'fixed', semantic: 'semantic', passage_native: 'passage' };
+const STAGE_LABEL = {
+  stt: 'stt', input_guardrail: 'input guard', retrieval: 'retrieval',
+  ontopic_guardrail: 'topic guard', generation: 'generation', groundedness_guardrail: 'ground guard',
+};
+
+const HISTORY_KEY = 'voicerag_history_v1';
+const HISTORY_LIMIT = 100;
+
+function saveToHistory(data) {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    list.unshift({
+      ts: Date.now(),
+      query_text: data.query_text || '',
+      answer: data.answer || '',
+      refused: !!data.refused,
+      refusal_reason: data.refusal_reason || null,
+      total_latency_ms: data.total_latency_ms || 0,
+      stage_timings_ms: data.stage_timings_ms || {},
+      retrieved: (data.retrieved || []).map(c => ({ strategy: c.strategy, score: c.score, text: c.text })),
+    });
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_LIMIT)));
+  } catch (err) {
+    // localStorage can throw in private-browsing / quota-exceeded cases --
+    // history is a nice-to-have, never let it break the actual answer flow.
+    console.warn('Could not save to local history:', err);
+  }
+}
+
+function renderResult(data) {
+  const div = document.getElementById('result');
+
+  if (data.error && !data.query_text && !data.answer) {
+    setOrbState('warn', 'something went wrong');
+    promptText.textContent = 'Ask another question.';
+    showBanner(data.error);
+    return;
+  }
+
+  setOrbState(data.refused ? 'warn' : 'ok', data.refused ? 'refused to answer' : 'grounded');
+  promptText.textContent = 'Ask another question.';
+  saveToHistory(data);
+
+  const timings = data.stage_timings_ms || {};
+  const maxMs = Math.max(1, ...Object.values(timings));
+  const barsHtml = Object.entries(timings).map(([k, v]) => `
+    <div class="lat-row">
+      <span class="lat-label">${escapeHtml(STAGE_LABEL[k] || k)}</span>
+      <div class="lat-track"><div class="lat-fill" style="width:${Math.max(2, (v / maxMs) * 100)}%"></div></div>
+      <span class="lat-value">${v.toFixed(1)}ms</span>
+    </div>`).join('');
+
+  const chunksHtml = (data.retrieved || []).map(c => `
+    <div class="chunk">
+      <div class="chunk-meta">
+        <span class="strategy-tag">${escapeHtml(STRATEGY_LABEL[c.strategy] || c.strategy)}</span>
+        <span class="score-tag">score ${c.score.toFixed(3)}</span>
+      </div>
+      ${escapeHtml(c.text)}
+    </div>`).join('') || `<div class="chunk">No context retrieved.</div>`;
+
+  div.innerHTML = `
+    <div class="answer-wrap">
+      <div class="transcript-line">you asked — <span>${escapeHtml(data.query_text) || '(empty)'}</span></div>
+      <div class="answer-text ${data.refused ? 'refused' : ''}">${escapeHtml(data.answer)}</div>
+      ${data.refused ? `<div class="refusal-reason">reason: ${escapeHtml(data.refusal_reason)}</div>` : ''}
+      <div class="save-note">saved to your <a href="/history">local history</a></div>
+
+      <details class="reveal">
+        <summary>how this was answered</summary>
+        <div class="reveal-body">
+          <div>
+            <div class="lat-total">total latency <b>${data.total_latency_ms.toFixed(1)}ms</b></div>
+            ${barsHtml}
+          </div>
+          <div>${chunksHtml}</div>
+        </div>
+      </details>
+    </div>`;
+}
+</script>
+</body>
+</html>
