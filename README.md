@@ -163,3 +163,34 @@ frontend/
   shared.css           design tokens + nav shared across all pages
 app.py                FastAPI entrypoint (page routes + /ask/audio, /ask/text APIs)
 ```
+
+## Problems we ran into (and how we solved them)
+
+Documented honestly, since real engineering has friction — these are the actual issues hit during development, not a cleaned-up narrative.
+
+### Environment & setup
+- **Python 3.14 was too new**: `pydantic-core`'s compiled wheels didn't support it yet, breaking `pip install` outright. Fixed by pinning the venv to Python 3.13.
+- **Port 8000 collision**: another local project was already bound to port 8000. Moved the app to port 8001.
+
+### Dataset ingestion
+- **HF's Xet CDN client stalled indefinitely** on the ~3.7GB parquet download (`.incomplete` file stuck at 0 bytes for minutes). Fixed with `HF_HUB_DISABLE_XET=1`, which falls back to plain HTTPS and also resumes cleanly from partial downloads on retry.
+- **Assumed dataset schema didn't match reality**: initial code assumed flat `Translated_passages`/`is_selected` fields; the actual schema nests them inside a `passages` struct. Found via direct schema inspection and fixed the row-parsing logic.
+- **pyarrow couldn't read the file with `datasets.load_dataset()`**: `ArrowNotImplementedError: Nested data conversions not implemented for chunked array outputs`. Root cause: the parquet file has a single ~780k-row row group, and pyarrow can't concatenate the nested `passages` struct/list column across the internal chunks that produces in one shot. Fixed by reading via `pyarrow.parquet.iter_batches()` directly instead, which never asks pyarrow to concatenate across chunks. This exact bug reappeared later when a teammate's rewrite of the ingestion script went back to `datasets.load_dataset()` — fixed the same way a second time.
+- **Qdrant's local file-mode store only allows one process at a time**: running the ingest script while another process already held the store threw `RuntimeError: Storage folder ... is already accessed by another instance`. Resolved by making sure only one ingest process runs against the local store at once.
+
+### Models & APIs
+- **Groq deprecated the model we'd built against** (`llama-3.3-70b-versatile` returned a 404 partway through development). Queried Groq's live model list and switched to `openai/gpt-oss-120b`.
+- **Sarvam dataset language default was wrong**: `HF_DATASET_LANG` defaulted to `hi`, but the actual parquet filename prefix is `hin` (`train/hintrain.parquet`) — dataset loading failed outright until this was corrected.
+
+### Frontend
+- **Dark-on-dark rendering bug**: the page had no explicit `background` on `body`, so it rendered invisible text in some environments. Fixed by setting the background explicitly rather than relying on inheritance.
+- **Background canvas invisible despite drawing correctly**: a `position: fixed` element with negative `z-index` was being composited behind the page in some render paths. Fixed by restructuring the stacking so background layers use `z-index: 0` and foreground content explicitly uses `z-index: 1`, instead of relying on negative z-index.
+- **A glow effect rendered as a hard box instead of a soft radial fade**: its radius could exceed the canvas's own bounds and get truncated at the canvas's rectangular edge. Fixed by clamping the radius to fit inside the canvas.
+
+### Integrating three people's work
+- Merging independently-written modules surfaced real interface mismatches: a script importing a function (`iter_rows`) that a teammate's rewrite had removed, `sys.path` calculations that were off by one directory level after scripts got moved into a new folder, and (see above) the same pyarrow bug being reintroduced by a parallel rewrite. All caught by actually running the merged code end-to-end rather than assuming a clean `git merge` meant a working app, and fixed one at a time.
+
+### Deployment
+- **Oracle Cloud's Always Free tier was unreliable to provision** (capacity/signup friction) despite being the best-fit option for the full ~3.7GB dataset (its Ampere shape uniquely offers up to 24GB free RAM, which the in-memory vector index needs at this scale). Fell back to a Cloudflare quick tunnel exposing the already-working local instance instead, trading "always-on" for "zero new infrastructure, full dataset intact, working immediately."
+- **The quick tunnel is inherently fragile**: it depends on the host laptop staying on, and the URL is randomly assigned per session with no way to reclaim a specific hostname once it disconnects — ours died once from a network interruption and had to be restarted under a new URL. Mitigated by keeping the README updated as the canonical source of the current working link, and adding an in-app fallback banner pointing back to it.
+- **iCloud Drive silently reorganized the project folder mid-session** (a known disruptive behavior of Desktop & Documents sync), moving the project to a new path and breaking anything that referenced the old one — including the tunnel restart command. The running app server itself was unaffected (Unix processes keep working via open file handles even if their directory is moved), only new commands referencing the old path failed. Found by checking process state directly rather than assuming the filesystem path was still valid.
