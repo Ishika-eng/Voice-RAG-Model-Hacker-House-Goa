@@ -110,6 +110,22 @@ footer.site-footer {
 footer.site-footer a { color: var(--ink-faint); text-decoration: none; }
 footer.site-footer a:hover { color: var(--ink-dim); }
 
+/* Fallback notice, injected on every page via shared.css so it doesn't
+   need editing 4 separate HTML files. If this tunnel URL ever rotates
+   again, the GitHub README is kept as the canonical up-to-date link. */
+body::before {
+  content: "⚠ Having trouble reaching this page? The current working link is always kept up to date at github.com/Ishika-eng/Voice-RAG-Model-Hacker-House-Goa (see README)";
+  display: block;
+  background: var(--ground-3, #1c1533);
+  color: var(--warn, #f2b483);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line, #2a2144);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
