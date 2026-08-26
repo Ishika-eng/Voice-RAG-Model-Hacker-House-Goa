@@ -4,8 +4,8 @@
 
 Repo: [github.com/Ishika-eng/Voice-RAG-Model-Hacker-House-Goa](https://github.com/Ishika-eng/Voice-RAG-Model-Hacker-House-Goa)
 
-**🔴 Live demo: [surgeon-rebate-chambers-editing.trycloudflare.com](https://surgeon-rebate-chambers-editing.trycloudflare.com)**
-> This is a temporary tunnel to a locally-hosted instance, not a permanent deployment. If it's unreachable, this README is kept up to date with the current working link — check back here for the latest URL.
+**🔴 Live demo: [martin-deaf-collectables-universities.trycloudflare.com](https://martin-deaf-collectables-universities.trycloudflare.com)**
+> This is a temporary tunnel to a locally-hosted instance, not a permanent deployment — it has already rotated twice since submission (free Cloudflare quick tunnels have no uptime guarantee over multi-day periods). If it's unreachable, this README is kept up to date with the current working link — check back here for the latest URL.
 
 Voice-enabled Retrieval-Augmented Generation over [`ai4bharat/MSMARCO-XI`](https://huggingface.co/datasets/ai4bharat/MSMARCO-XI).
 
